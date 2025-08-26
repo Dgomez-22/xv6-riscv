@@ -80,12 +80,12 @@ De ahí continué con la tarea y pude correr bien el:
 
 Aquí adjunto las fotos de esos comandos en xv6
 
-1. Comandos ls y echo
+1. Comandos ls y echo  
 
-![Comandos ls y echo](Sistemas Operativos - T0 - LS_y_ECHO.png)
+![Comandos ls y echo](LS_y_ECHO.png)
 
-2. Comando cat README
+2. Comando cat README  
 
-![Comando cat README](Sistemas Operativos - T0 - cat_README.png)
+![Comando cat README](cat_README.png)
 
 Con esto quedó instalado y funcionando xv6-riscv en WSL
