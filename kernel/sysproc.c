@@ -114,3 +114,23 @@ sys_getppid(void)
     return p->parent->pid;
   return -1;
 }
+
+uint64
+sys_getancestor(void)
+{
+  int n;
+  argint(0, &n);
+  if (n < 0)
+    return -1;
+
+  struct proc *cur = myproc();
+  while (n > 0 && cur != 0) {
+    cur = cur->parent;
+    n--;
+  }
+
+  if (cur == 0)
+    return -1;
+
+  return cur->pid;
+}
