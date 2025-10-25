@@ -353,8 +353,11 @@ kexit(int status)
 
   // Parent might be sleeping in wait().
   wakeup(p->parent);
-  
   acquire(&p->lock);
+
+
+// ------ IMPRIMIMOS PARA VER LOS TICKETS Y SLICES ------ //
+  printf("PID %d saliendo: tickets=%d, cpu_slices=%d\n", p->pid, p->tickets, p->cpu_slices);
 
   p->xstate = status;
   p->state = ZOMBIE;

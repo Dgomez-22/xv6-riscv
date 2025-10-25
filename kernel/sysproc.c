@@ -141,9 +141,7 @@ uint64
 sys_settickets(void)
 {
   int n;
-  if(argint(0, &n) < 0){ // Obtenemos el argumento entero enviado por el usuario
-    return -1;		 // Retornamos error en caso de falla
-  }
+  argint(0, &n);
 
   if(n < 1){
     n = 1; 	// Garantizamos al menos un ticket (evitar errores)
