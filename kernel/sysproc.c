@@ -7,6 +7,8 @@
 #include "proc.h"
 #include "vm.h"
 
+extern struct proc* myproc(void); // Es una función que llama de afuera, devuelve el proceso actual
+
 uint64
 sys_exit(void)
 {
@@ -133,4 +135,24 @@ sys_getancestor(void)
     return -1;
 
   return cur->pid;
+}
+
+uint64
+sys_settickets(void)
+{
+  int n;
+  if(argint(0, &n) < 0){ // Obtenemos el argumento entero enviado por el usuario
+    return -1;		 // Retornamos error en caso de falla
+  }
+
+  if(n < 1){
+    n = 1; 	// Garantizamos al menos un ticket (evitar errores)
+  }
+
+  struct proc *p = myproc(); // Obtenemos el proceso que está ejecutando esta call
+  acquire(&p->lock);	// Bloqueamos el proceso para editarlo
+  p->tickets = n;	// Asignamos el nuevo núm de tickets
+  release(&p->lock);	// Liberamos el lock
+
+  return 0;
 }

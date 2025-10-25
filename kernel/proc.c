@@ -93,7 +93,7 @@ int
 allocpid()
 {
   int pid;
-  
+
   acquire(&pid_lock);
   pid = nextpid;
   nextpid = nextpid + 1;
@@ -124,6 +124,10 @@ allocproc(void)
 found:
   p->pid = allocpid();
   p->state = USED;
+
+  // Iniciamos el lottery scheduling
+  p->tickets = 100;
+  p->cpu_slices = 0;
 
   // Allocate a trapframe page.
   if((p->trapframe = (struct trapframe *)kalloc()) == 0){
@@ -223,7 +227,7 @@ userinit(void)
 
   p = allocproc();
   initproc = p;
-  
+
   p->cwd = namei("/");
 
   p->state = RUNNABLE;
@@ -418,46 +422,94 @@ kwait(uint64 addr)
 //  - swtch to start running that process.
 //  - eventually that process transfers control
 //    via swtch back to the scheduler.
+
+
+
+// ------ Aquí comienza el lottery scheduler ------
+
+// Hacemos un generador de randoms
+static unsigned long rand_state = 123456789;
+
+static int
+rand_next(void) {
+  rand_state = rand_state * 1103515245 + 12345;
+  return (rand_state >> 16) & 0x7fffffff;
+}
+
 void
 scheduler(void)
 {
-  struct proc *p;
-  struct cpu *c = mycpu();
+  struct cpu *c = mycpu();  // La cpu donde correrá el scheduler
+  c->proc = 0;		    // Sin proceso asignado al inicio
 
-  c->proc = 0;
   for(;;){
-    // The most recent process to run may have had interrupts
-    // turned off; enable them to avoid a deadlock if all
-    // processes are waiting. Then turn them back off
-    // to avoid a possible race between an interrupt
-    // and wfi.
+
+    // Habilitamos interrupciones para permitir timer y eventos
     intr_on();
-    intr_off();
 
-    int found = 0;
-    for(p = proc; p < &proc[NPROC]; p++) {
-      acquire(&p->lock);
-      if(p->state == RUNNABLE) {
-        // Switch to chosen process.  It is the process's job
-        // to release its lock and then reacquire it
-        // before jumping back to us.
-        p->state = RUNNING;
-        c->proc = p;
-        swtch(&c->context, &p->context);
+    // Inicializamos variables
+    int total_tickets = 0;	// Acumulará el total de tickets de los procesos listos
+    int runnable_found = 0;	// Va a indicar si existe al menos un proceso en estado runnable
 
-        // Process is done running for now.
-        // It should have changed its p->state before coming back.
-        c->proc = 0;
-        found = 1;
+    struct proc *p;
+
+    // Recorremos la tabla de procesos
+    for(p = proc; p < &proc[NPROC]; p++){
+      acquire(&p->lock);	// Bloqueamos el proceso para  leer/modificar de manera segura
+
+      // Vemos si el proceso está listo para correr
+      if(p->state == RUNNABLE){
+        runnable_found = 1;	// Confirma que hay un runnable
+
+	// Vemos si un proceso tiene menos de un ticket, por si acaso
+        if(p->tickets < 1){
+          p->tickets = 1;	// Por seguridad le añadimos un ticket (para evitar errores)
+        }
+
+	// Sumamos los tickets al total (para lo probabilidad de elección)
+        total_tickets += p->tickets;
       }
+
+      // Liberamos el lock antes del pasar al que viene
       release(&p->lock);
     }
-    if(found == 0) {
-      // nothing to run; stop running on this core until an interrupt.
+
+    // Ponemos la cpu en espera cuando no hayan procesos listos para correr
+    if(runnable_found == 0 || total_tickets == 0){
+      intr_off();
       asm volatile("wfi");
+      intr_on();
+      continue;
+    }
+
+    // Generamos un número random entre 1 y el total de tickets
+    int r = (rand_next() % total_tickets) + 1;
+    // Hacemos un "acumulador" para ir sumando los tickets
+    int acc = 0;
+
+
+
+    for(p = proc; p < &proc[NPROC]; p++){	// Recorremos la tabla de los procesos
+      acquire(&p->lock);			// Bloqueamos el proceso
+      if(p->state == RUNNABLE){		// Vemos que sean solo procesos listos para correr
+        acc += p->tickets;		// Sumamos los tickets al acc
+        if(acc >= r){			// Cuando se alcanza el número ganador, dicho proceso gana la lotería
+          p->state = RUNNING;		// Marcamos el proceso como en ejecución
+          p->cpu_slices++;	// Cuántas veces este proceso fue elegido por la cpu
+
+          c->proc = p;		// Asociamos el proceso actual a la cpu
+          swtch(&c->context, &p->context);	// Ejecutamos el proceso cambiando el contexto
+          c->proc = 0;		// Limpiamos/reseteamos el puntero
+
+          release(&p->lock);	// Liberamos el lock del proceso
+          break;		// Salimos del for
+        }
+      }
+      release(&p->lock);	//  Liberamos el lock  y seguimos al siguiente proceso
     }
   }
 }
+
 
 // Switch to scheduler.  Must hold only p->lock
 // and have changed proc->state. Saves and restores

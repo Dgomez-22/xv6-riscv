@@ -26,6 +26,7 @@ int pause(int);
 int uptime(void);
 int getppid(void);
 int getancestor(int n);
+int settickets(int n);
 
 // ulib.c
 int stat(const char*, struct stat*);
