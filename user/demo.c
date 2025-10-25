@@ -2,48 +2,67 @@
 #include "kernel/stat.h"
 #include "user/user.h"
 
-// Esta demo crea 10 procesos hijos
-// Cada proceso hijo se asigna una cantidad distinta de tickets usando el settickets()
-// Luego hace un loop grande para consumir cpu
-// Al final imprime su PID y cuántos tickets le dimos
-// El padre espera a que todos terminen
+// =========================
+// Settings del demo.c
+// =========================
+
+// Cantidad de procesos hijos
+#define NCHILD 15
+
+// Cantidad de bloques de trabajo que hará cada hijo (más grande -> más tiempo)
+#define OUTER_LOOPS 10
+
+// Carga de cada bloque (mientras más grande, más cpu consume cada bloque)
+#define INNER_WORK 50000000UL
+
+// ============================================================================
+// Para hacerlo más rápido o más lento, cambiar el OUTER_LOOPS y el INNER_WORK
+// ============================================================================
+
+int sleep(int ticks);
 
 int
 main(void)
 {
   int i;
 
-  for (i = 0; i < 10; i++) {
+  for (i = 0; i < NCHILD; i++) {
     int pid = fork();
     if (pid < 0) {
-      // Por si hay error al forkear
-      printf("fork fallo\n");
+      printf("fork fallo en i=%d\n", i);
       exit(1);
     }
 
     if (pid == 0) {
-      // ----- PROCESO HIJO -----
-      int mytickets = 50 * (i + 1);  // 50, 100, 150, ..., 500
+      // =====
+      // HIJO
+      // =====
+
+      // Asignar tickets distintos, múltiplos de 50
+      int mytickets = 50 * (i + 1);
       settickets(mytickets);
 
-      // trabajo artificial para gastar CPU
-      volatile unsigned long x = 0;
-      for (unsigned long k = 0; k < 100000000UL; k++) {
-        x = x + k;
+      // En cuanto al trabajo: usamos algunos bloques medianos en vez de un bloque gigante, para poder refinar los bloques de mejor manera
+      // Esto hace que el timer del kernel interrumpa algunas veces, así el scheduler va eligiendo repetidamente a cada proceso.
+      for (int block = 0; block < OUTER_LOOPS; block++) {
+        volatile unsigned long acc = 0;
+        for (unsigned long k = 0; k < INNER_WORK; k++) {
+          acc += k;
+        }
       }
 
-      // Mensaje final del proceso hijo
       printf("[Hijo PID %d] Terminé con %d tickets\n", getpid(), mytickets);
-
-      exit(0); // Proceso hijo sale
+      exit(0);
     }
 
-    // ----- PROCESO PADRE -----
-    // El proceso padre sigue el for y crea el siguiente proceso hijo
+    // ======
+    // PADRE
+    // ======
+    // El proceso padre sigue creando más hijos
   }
 
-  // Proceso Padre: esperar a que terminen todos los hijos
-  for (i = 0; i < 10; i++) {
+  // El proceso padre espera a todos los hijos
+  for (i = 0; i < NCHILD; i++) {
     wait(0);
   }
 
