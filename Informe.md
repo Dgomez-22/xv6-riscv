@@ -1,37 +1,94 @@
-Primero, abrimos ubuntu y creamos la nueva rama "Tarea_2-Dgomez-Tpoblete" con:
+### 1. La implementación del Lottery Scheduler ###
 
-  > git checkout -b Tarea_2-Dgomez-Tpoblete
+Primero, abrimos Ubuntu y creamos la nueva rama:
 
-Luego nos adentramos en las carpetas hasta llegar a proc.h, donde le agregamos esto:
+    git checkout -b Tarea_2-Dgomez-Tpoblete
 
-  > int tickets;       (la cantidad de tickets asignados al proceso para el lottery scheduling)
-  > int cpu_slices;    (el contador de cuantas veces el proceso fue elegido por la cpu)
+Luego, entramos a proc.h y agregamos dos nuevos campos dentro de struct proc:
 
-Guardamos y salimos, luego nos metimos a proc.c y modificamos lo siguiente:
+    int tickets;      // cantidad de tickets asignados al proceso
+    int cpu_slices;   // cuántas veces el proceso fue elegido por la CPU
 
-  1) En alloproc() asignamos el valor inicial para los tickets (100) y el numero inicial de slices (0)
-  2) En scheduler() borramos el que había antes y agregamos el lottery scheduler, que funciona de la siguiente manera:
+Después fuimos a proc.c y modificamos lo siguiente:
 
-  > Calculamos el número total de tickets (sumamos los tickets de los runnables)
-  > Si el total de tickets es 0, saltamos al ciclo que viene
-  > Generamos un número (pseudo) aleatorio ganador , entre 1 ticket y el total
-  > Buscamos qué proceso ganó y lo ejecutamos
-  > Le sumamos cpu_slices al proceso que ganó (antes de correr dicho proceso)
+1- En allocproc() inicializamos los nuevos valores:
 
-Luego nos fuimos a syscall.h donde le asignamos el número "identificador" por así decir
-Después nos fuimos a syscall.c y "linkeamos" el num identificador con la función sys_settickets()
-Con esto ya listo, fuimos a user.h para que los programas en el modo usuario reconozcan que settickets() es válida y llamable
-Para poder hacer que se "cree" automáticamente, en usys.pl agregamos el settickets como un "entry", de manera en que al crearse usys.S el settickets también aparece dentro
+    tickets = 100 (el valor base por defecto)
+    cpu_slices = 0
 
-Esto mismo del usys ".S" y ".pl" era lo que nos complicó la tarea pasada, por lo que esta vez no tuvimos problemas
-Ya sabíamos que al hacer el make clean el ".S" se borraba y era re-creado por el ".pl"
+2- En scheduler() reemplazamos el scheduler original por nuestro lottery scheduler:
 
-Por último creamos el demo.c, en la carpeta user, para que creara varios procesos hijos con cantidades distintas de tickets usando el settickets()
-Cada proceso hijo ejecuta su "carga" que le pusimos como parámetro y muestra como resultado:
+    1- Sumamos los tickets de todos los procesos RUNNABLE
 
-  > Su "prioridad" (se imprimen primero los que "ganaron" antes)
-  > El número de tickets que tuvo al inicio
-  > El número de cpu_slices
+    2- Si el total es 0, pasamos al siguiente ciclo
 
-En general, nos dio que aquel proceso que tenía más tickets era el que salía antes (recordar, es probabilístico, por lo que hay casos en que aquellos con menos tickets se imprimen primero)
-El demo.c está mejor explicado dentro del propio código, e intentamos hacer que se pudiesen cambiar los parámetros fácilmente, algo más tipo modular por así decir
+    3- Generamos un número aleatorio dentro del rango 1 hasta el total de tickets
+
+    4- Recorremos los procesos hasta que acumulando tickets encontremos al ganador
+
+    5- Ponemos ese proceso en RUNNING y sumamos cpu_slices
+
+
+Luego registramos la nueva syscall settickets():
+
+    1- En syscall.h le asignamos un número identificador (SYS_settickets)
+
+    2- En syscall.c conectamos ese número con la función sys_settickets
+
+    3- En sysproc.c implementamos sys_settickets(int n) para modificar los tickets del proceso actual
+
+    4- En user.h declaramos int settickets(int);
+
+    5- En lugar de modificar usys.S manualmente, agregamos entry("settickets") en usys.pl, 
+    para que el stub se genere automáticamente al compilar
+
+Con el sistema ya funcionando, creamos demo.c en la carpeta user/.
+
+Este archivo crea varios procesos hijos con distintos tickets, ejecutan carga de CPU, y al terminar imprimen: PID, tickets asignados y cpu_slices.
+
+En las pruebas se confirmó que los procesos con más tickets suelen terminar antes (porque tienen más probabilidad de ganar la lotería), pero al ser probabilístico, no es 100% determinista.
+
+### 2. Problemas y soluciones ###
+
+1- Problema con la generación del stub de la syscall (settickets)
+
+    Problema: En la tarea anterior intentamos modificar usys.S directamente, pero make clean lo regeneraba y borraba los cambios.
+
+    Solución: Esta vez agregamos la entrada en usys.pl, lo que hace que usys.S se reconstruya con la syscall incluida automáticamente.
+
+2- Choque de impresiones en demo.c
+
+    Problema: La salida de varios hijos se mezclaba en consola al terminar casi al mismo tiempo.
+
+    Solución: Ajustamos una pequeña pausa, con delay y sleep
+
+    Problema 2: Las implementaciones con delay y sleep estaban mal hechas
+
+    Solución 2: Quitamos delay y sleep, y aumentamos la carga de la cpu, para que se demore más y así se no se sobrelapen los mensajes
+
+### 3. Problemas del Lottery Scheduler ###
+
+    1- No garantiza justicia determinista → procesos con pocos tickets pueden ganar varias veces seguidas por azar.
+
+    2- No sirve para tiempo real → no asegura tiempos máximos de respuesta, solo probabilidades.
+
+    3- Puede provocar starvation indirecto → si un proceso tiene muy pocos tickets y hay procesos con muchos, 
+    puede tardar demasiado en ejecutarse.
+
+    4- No controla prioridades exactas → solo probabilísticas, no “este proceso debe tener 40% de CPU fijo”.
+
+    5- Escala mal con muchos procesos → el scheduler debe sumar tickets y recorrer procesos en cada tick.
+
+    6- No considera otros factores importantes del sistema (I/O, memoria, CPU usage acumulado, afinidad, etc.).
+
+### 4. Estado final de la tarea ###
+
+    1- El Scheduler reemplazado correctamente
+    
+    2- El Syscall quedó implementado y funcional
+    
+    3- La Demo ha sido probada con distintos tickets
+    
+    4- Confirmamos el comportamiento probabilístico esperado
+    
+    5- Verificamos consistencias y redundancias básicas para evitar errores
