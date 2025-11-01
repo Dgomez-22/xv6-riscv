@@ -92,3 +92,7 @@ En las pruebas se confirmó que los procesos con más tickets suelen terminar an
     4- Confirmamos el comportamiento probabilístico esperado
     
     5- Verificamos consistencias y redundancias básicas para evitar errores
+
+### 5. Output esperado ###
+
+![Diagrama Lottery](image_2025-10-31_220752169.png)
