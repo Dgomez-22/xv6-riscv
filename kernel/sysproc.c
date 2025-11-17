@@ -7,6 +7,81 @@
 #include "proc.h"
 #include "vm.h"
 
+// Helper para modificar permisos de lectura.
+// enable_read = 0 → quitar lectura (mrdprotect)
+// enable_read = 1 → permitir lectura (munrdprotect)
+static int
+do_rdprotect(uint64 addr, int len, int enable_read)
+{
+  struct proc *p = myproc();
+  pagetable_t pt = p->pagetable;
+
+  // Validaciones básicas
+  if(len <= 0)
+    return -1;
+
+  if(addr % PGSIZE != 0)
+    return -1;
+
+  for(int i = 0; i < len; i++){
+    uint64 va = addr + (uint64)i * PGSIZE;
+
+    if(va >= MAXVA)
+      return -1;
+
+    pte_t *pte = walk(pt, va, 0);
+    if(pte == 0)
+      return -1;
+
+    if((*pte & PTE_V) == 0)
+      return -1;
+
+    if((*pte & PTE_U) == 0)
+      return -1;
+  }
+
+  // Modificar permisos
+  for(int i = 0; i < len; i++){
+    uint64 va = addr + (uint64)i * PGSIZE;
+    pte_t *pte = walk(pt, va, 0);
+
+    if(enable_read)
+      *pte |= PTE_R;
+    else
+      *pte &= ~PTE_R;
+  }
+
+  // Limpiar TLB
+  sfence_vma();
+
+  return 0;
+}
+
+uint64
+sys_mrdprotect(void)
+{
+  uint64 addr;
+  int len;
+
+  // En tu xv6, argaddr y argint son void, no devuelven int
+  argaddr(0, &addr);
+  argint(1, &len);
+
+  return do_rdprotect(addr, len, 0);  // 0 = quitar lectura
+}
+
+uint64
+sys_munrdprotect(void)
+{
+  uint64 addr;
+  int len;
+
+  argaddr(0, &addr);
+  argint(1, &len);
+
+  return do_rdprotect(addr, len, 1);  // 1 = restaurar lectura
+}
+
 extern struct proc* myproc(void); // Es una función que llama de afuera, devuelve el proceso actual
 
 uint64

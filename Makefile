@@ -145,6 +145,7 @@ UPROGS=\
 	$U/_yosoytupadre\
 	$U/_getancestor\
 	$U/_demo\
+	$U/_rdprotect_test
 
 fs.img: mkfs/mkfs README $(UPROGS)
 	mkfs/mkfs fs.img README $(UPROGS)
