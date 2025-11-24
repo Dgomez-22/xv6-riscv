@@ -5,41 +5,41 @@
 int
 main(void)
 {
-  // Dirección actual del heap
+  // Obtenemos la dirección actual del heap
   char *addr = sbrk(0);
 
   // Reservamos exactamente una página (4096 bytes)
   if(sbrk(4096) == (void*)-1){
-    printf("sbrk fallo\n");
+    printf("Error al pedir memoria con sbrk()\n");
     exit(1);
   }
 
-  // Escribimos algo antes de proteger
+  // Escribimos algo antes de proteger la página
   addr[0] = 'Z';
-  printf("Escritura inicial ok: addr[0] = %c\n", addr[0]);
+  printf("Antes de proteger -> addr[0] = %c\n", addr[0]);
 
   // Activamos la protección contra lectura
   if(mrdprotect(addr, 1) < 0){
-    printf("mrdprotect fallo\n");
+    printf("mrdprotect no funcionó\n");
     exit(1);
   }
-  printf("mrdprotect aplicado sobre una pagina a partir de %p\n", addr);
+  printf("Protección activada en la página que parte en %p\n", addr);
 
-  // ⚠️ NO volvemos a escribir aquí, porque en RISC-V
-  // una pagina con W=1 y R=0 se trata como invalida.
+  // Ahora hacemos un intento de lectura: debería provocar un page fault
+  // y se debería matar el proceso
 
-  // Intento de lectura: deberia provocar un page fault y matar el proceso
-  printf("A punto de leer addr[0] (deberia crashear ahora)...\n");
+  printf("A punto de leer addr[0] (debería crashear ahora)...\n");
+
   char c = addr[0];  // load → page fault
-  printf("Valor leido: %c (ESTO NO DEBERIA IMPRIMIRSE)\n", c);
+  printf("Valor leido: %c (Este valor no debería verse NUNCA)\n", c);
 
-  // Si por alguna razon llegamos aqui, revertimos la proteccion
+  // Si por algo llegamos aqui, revertimos la protección
   if(munrdprotect(addr, 1) < 0){
-    printf("munrdprotect fallo\n");
+    printf("munrdprotect falló\n");
     exit(1);
   }
 
-  printf("Proteccion revertida correctamente.\n");
+  printf("Proteccion revertida correctamente. (No deberíamos ver este print)\n");
   exit(0);
 }
 

@@ -357,7 +357,7 @@ kexit(int status)
 
 
 // ------ IMPRIMIMOS PARA VER LOS TICKETS Y SLICES ------ //
-  printf("PID %d saliendo: tickets=%d, cpu_slices=%d\n", p->pid, p->tickets, p->cpu_slices);
+//  printf("PID %d saliendo: tickets=%d, cpu_slices=%d\n", p->pid, p->tickets, p->cpu_slices);
 
   p->xstate = status;
   p->state = ZOMBIE;

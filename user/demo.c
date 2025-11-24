@@ -29,7 +29,6 @@ main(void)
   for (i = 0; i < NCHILD; i++) {
     int pid = fork();
     if (pid < 0) {
-      printf("fork fallo en i=%d\n", i);
       exit(1);
     }
 
@@ -50,8 +49,6 @@ main(void)
           acc += k;
         }
       }
-
-      printf("[Hijo PID %d] Terminé con %d tickets\n", getpid(), mytickets);
       exit(0);
     }
 
@@ -66,6 +63,5 @@ main(void)
     wait(0);
   }
 
-  printf("Todos los hijos terminaron.\n");
   exit(0);
 }
